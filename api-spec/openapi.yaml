@@ -1,0 +1,514 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: Banco de Horas Pro API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: auth
+    description: Authentication operations
+  - name: records
+    description: Time records
+  - name: settings
+    description: App settings
+  - name: summary
+    description: Dashboard summary
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /auth/register:
+    post:
+      operationId: registerUser
+      tags: [auth]
+      summary: Criar um novo usuário administrador
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthInput"
+      responses:
+        "201":
+          description: Usuário criado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Usuário já existe ou dados inválidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/login:
+    post:
+      operationId: loginUser
+      tags: [auth]
+      summary: Autenticar usuário com usuário e senha
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthInput"
+      responses:
+        "200":
+          description: Autenticado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Usuário ou senha incorretos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /records:
+    get:
+      operationId: listRecords
+      tags: [records]
+      summary: List all time records
+      parameters:
+        - name: month
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: year
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TimeRecord"
+    post:
+      operationId: createRecord
+      tags: [records]
+      summary: Create a time record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TimeRecordInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TimeRecord"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Record for this date already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /records/{id}:
+    get:
+      operationId: getRecord
+      tags: [records]
+      summary: Get a single record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TimeRecord"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: updateRecord
+      tags: [records]
+      summary: Update a time record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TimeRecordUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TimeRecord"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteRecord
+      tags: [records]
+      summary: Delete a time record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Get app settings
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+    put:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Update app settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SettingsUpdate"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+
+  /summary:
+    get:
+      operationId: getSummary
+      tags: [summary]
+      summary: Get dashboard summary stats
+      responses:
+        "200":
+          description: Summary stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Summary"
+
+  /summary/monthly-evolution:
+    get:
+      operationId: getMonthlyEvolution
+      tags: [summary]
+      summary: Get monthly balance evolution for chart
+      responses:
+        "200":
+          description: Monthly evolution data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MonthlyEvolution"
+
+  /summary/missing-days:
+    get:
+      operationId: getMissingDays
+      tags: [summary]
+      summary: Get list of missing workdays with no records
+      responses:
+        "200":
+          description: Missing days
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MissingDay"
+
+  /records/export:
+    get:
+      operationId: exportRecords
+      tags: [records]
+      summary: Export records as CSV string
+      responses:
+        "200":
+          description: CSV data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportData"
+
+  /records/bulk-generate:
+    post:
+      operationId: bulkGenerateMonth
+      tags: [records]
+      summary: Auto-fill all workdays in a month with standard 08:00-16:10 schedule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkGenerateBody"
+      responses:
+        "200":
+          description: Result with count of created and skipped records
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkGenerateResult"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    AuthInput:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          description: Nome de usuário para acesso
+        password:
+          type: string
+          description: Senha de acesso
+          format: password
+
+    AuthResponse:
+      type: object
+      required: [success, message, username]
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        username:
+          type: string
+
+    TimeRecord:
+      type: object
+      required: [id, date, type, balanceMinutes, workedMinutes, createdAt]
+      properties:
+        id:
+          type: integer
+        date:
+          type: string
+          description: ISO date string (YYYY-MM-DD)
+        type:
+          type: string
+          enum: [WORK_DAY, COMPENSATED_LEAVE, HOLIDAY]
+        entryTime:
+          type: ["string", "null"]
+          description: HH:MM format
+        exitTime:
+          type: ["string", "null"]
+          description: HH:MM format
+        workedMinutes:
+          type: integer
+        balanceMinutes:
+          type: integer
+        note:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    TimeRecordInput:
+      type: object
+      required: [date, type]
+      properties:
+        date:
+          type: string
+        type:
+          type: string
+          enum: [WORK_DAY, COMPENSATED_LEAVE, HOLIDAY]
+        entryTime:
+          type: ["string", "null"]
+        exitTime:
+          type: ["string", "null"]
+        note:
+          type: ["string", "null"]
+
+    TimeRecordUpdate:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [WORK_DAY, COMPENSATED_LEAVE, HOLIDAY]
+        entryTime:
+          type: ["string", "null"]
+        exitTime:
+          type: ["string", "null"]
+        note:
+          type: ["string", "null"]
+
+    Settings:
+      type: object
+      required: [id, dailyTargetMinutes, manualAdjustmentMinutes, lunchBreakMinutes]
+      properties:
+        id:
+          type: integer
+        dailyTargetMinutes:
+          type: integer
+          description: Daily work target in minutes (default 430 = 07:10)
+        manualAdjustmentMinutes:
+          type: integer
+          description: Manual balance adjustment for previous months
+        lunchBreakMinutes:
+          type: integer
+          description: Lunch break duration in minutes (default 60)
+        goalMinutes:
+          type: integer
+          nullable: true
+          description: Optional target balance in minutes (e.g. 0 = zero out the bank)
+
+    SettingsUpdate:
+      type: object
+      properties:
+        dailyTargetMinutes:
+          type: integer
+        manualAdjustmentMinutes:
+          type: integer
+        lunchBreakMinutes:
+          type: integer
+        goalMinutes:
+          type: integer
+          nullable: true
+          description: Target balance in minutes, or null to disable goal
+
+    Summary:
+      type: object
+      required: [totalBalanceMinutes, daysWorked, compensatedLeaves, holidays, manualAdjustmentMinutes]
+      properties:
+        totalBalanceMinutes:
+          type: integer
+        daysWorked:
+          type: integer
+        compensatedLeaves:
+          type: integer
+        holidays:
+          type: integer
+        manualAdjustmentMinutes:
+          type: integer
+
+    MonthlyEvolution:
+      type: object
+      required: [month, year, label, cumulativeBalanceMinutes, monthBalanceMinutes]
+      properties:
+        month:
+          type: integer
+        year:
+          type: integer
+        label:
+          type: string
+        cumulativeBalanceMinutes:
+          type: integer
+        monthBalanceMinutes:
+          type: integer
+
+    MissingDay:
+      type: object
+      required: [date, dayOfWeek]
+      properties:
+        date:
+          type: string
+        dayOfWeek:
+          type: string
+
+    ExportData:
+      type: object
+      required: [csv, filename]
+      properties:
+        csv:
+          type: string
+        filename:
+          type: string
+
+    BulkGenerateBody:
+      type: object
+      required: [year, month]
+      properties:
+        year:
+          type: integer
+        month:
+          type: integer
+
+    BulkGenerateResult:
+      type: object
+      required: [created, skipped]
+      properties:
+        created:
+          type: integer
+          description: Number of records created
+        skipped:
+          type: integer
+          description: Number of days skipped (already existed, holiday, or Sunday)
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
