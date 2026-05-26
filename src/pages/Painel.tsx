@@ -39,7 +39,7 @@ function SummaryCard({
       className={cn(
         "rounded-2xl border p-4 flex flex-col gap-3 shadow-sm",
         bgClass ?? "bg-card border-card-border",
-        fullWidth && "col-span-2"
+        fullWidth && "col-span-2 md:col-span-2 lg:col-span-4"
       )}
     >
       <div className="flex items-center gap-2">
@@ -102,7 +102,7 @@ function GoalCard({
   const daysLeft = lastDay - now.getDate();
 
   return (
-    <div className="col-span-2 bg-card border border-card-border rounded-2xl p-4 shadow-sm space-y-3">
+    <div className="col-span-2 md:col-span-2 lg:col-span-4 bg-card border border-card-border rounded-2xl p-4 shadow-sm space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Target size={16} className="text-primary" />
@@ -178,19 +178,19 @@ export default function Painel() {
       </h1>
 
       {isLoading ? (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3">
           {[...Array(5)].map((_, i) => (
             <div
               key={i}
               className={cn(
                 "bg-card border border-card-border rounded-2xl p-4 h-24 animate-pulse",
-                i === 0 && "col-span-2"
+                i === 0 && "col-span-2 md:col-span-2 lg:col-span-4"
               )}
             />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3">
           <SummaryCard
             fullWidth
             icon={Clock}

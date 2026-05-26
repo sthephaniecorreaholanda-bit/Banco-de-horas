@@ -85,7 +85,7 @@ export default function Configuracoes() {
         Configurações da Jornada
       </h1>
 
-      <form onSubmit={handleSave} className="space-y-4">
+      <form onSubmit={handleSave} className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-4">
         {/* Daily target */}
         <div className="bg-card border border-card-border rounded-2xl p-5 shadow-sm space-y-3">
           <div>
@@ -232,7 +232,7 @@ export default function Configuracoes() {
         </div>
 
         {/* Info box */}
-        <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-2xl p-4 text-xs text-blue-700 dark:text-blue-300 space-y-1.5">
+        <div className="lg:col-span-2 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-2xl p-4 text-xs text-blue-700 dark:text-blue-300 space-y-1.5">
           <p className="font-semibold">Regras do sistema</p>
           <ul className="space-y-1 list-disc list-inside">
             <li>Alterações na meta diária afetam apenas registros futuros</li>
@@ -246,7 +246,7 @@ export default function Configuracoes() {
           data-testid="button-save-settings"
           type="submit"
           disabled={updateSettings.isPending}
-          className="w-full py-3 rounded-2xl bg-primary text-primary-foreground text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90 active:opacity-80 transition disabled:opacity-60 shadow-sm"
+          className="lg:col-span-2 w-full py-3 rounded-2xl bg-primary text-primary-foreground text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90 active:opacity-80 transition disabled:opacity-60 shadow-sm"
         >
           {updateSettings.isPending ? (
             <Loader2 size={16} className="animate-spin" />

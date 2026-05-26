@@ -112,7 +112,7 @@ export function Layout({
 
       {/* Main content — offset for sidebar */}
       <main className="flex-1 ml-14 sm:ml-56 min-h-screen">
-        <div className="max-w-3xl mx-auto px-4 py-6">{children}</div>
+        <div className="w-full px-4 sm:px-6 lg:px-8 py-6">{children}</div>
       </main>
     </div>
   );

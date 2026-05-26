@@ -19,7 +19,7 @@ export default function Personalizacao() {
             Aplicada nos botões, cards em destaque, ícones ativos e gráfico de evolução.
           </p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
           {ACCENT_COLORS.map((color) => {
             const isSelected = accent === color.key;
             return (
