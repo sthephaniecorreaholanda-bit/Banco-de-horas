@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetMissingDays,
-  useCreateRecord,
   useBulkGenerateMonth,
   getListRecordsQueryKey,
   getGetSummaryQueryKey,
@@ -10,10 +9,7 @@ import {
   getGetMissingDaysQueryKey,
 } from "@/lib/api-local";
 import { RecordForm } from "@/components/RecordForm";
-import { currentTime, todayISO } from "@/lib/time";
 import {
-  LogIn,
-  LogOut,
   AlertTriangle,
   X,
   ClipboardEdit,
@@ -25,11 +21,8 @@ import { useToast } from "@/hooks/use-toast";
 export default function RegistrarPonto() {
   const { data: missingDays } = useGetMissingDays();
   const [dismissedAlert, setDismissedAlert] = useState(false);
-  const [prefillEntry, setPrefillEntry] = useState<string | undefined>();
-  const [prefillExit, setPrefillExit] = useState<string | undefined>();
   const qc = useQueryClient();
   const { toast } = useToast();
-  const createRecord = useCreateRecord();
   const bulkGenerate = useBulkGenerateMonth();
 
   function invalidateAll() {
@@ -37,46 +30,6 @@ export default function RegistrarPonto() {
     qc.invalidateQueries({ queryKey: getGetSummaryQueryKey() });
     qc.invalidateQueries({ queryKey: getGetMonthlyEvolutionQueryKey() });
     qc.invalidateQueries({ queryKey: getGetMissingDaysQueryKey() });
-  }
-
-  function handleQuickEntry() {
-    const now = currentTime();
-    setPrefillEntry(now);
-    setPrefillExit(undefined);
-    document.getElementById("record-form")?.scrollIntoView({ behavior: "smooth" });
-    toast({
-      title: "Horário de entrada capturado",
-      description: `${now} pré-preenchido no formulário.`,
-    });
-  }
-
-  function handleQuickExit() {
-    const now = currentTime();
-    setPrefillExit(now);
-    createRecord.mutate(
-      {
-        data: {
-          date: todayISO(),
-          type: "WORK_DAY",
-          entryTime: prefillEntry ?? "08:00",
-          exitTime: now,
-        },
-      },
-      {
-        onSuccess: () => {
-          toast({ title: "Saída registrada", description: `Saída às ${now} salva com sucesso.` });
-          setPrefillEntry(undefined);
-          setPrefillExit(undefined);
-          invalidateAll();
-        },
-        onError: (err: unknown) => {
-          const msg =
-            (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
-            "Erro ao registrar saída.";
-          toast({ title: "Erro", description: msg, variant: "destructive" });
-        },
-      }
-    );
   }
 
   function handleBulkGenerate() {
@@ -94,7 +47,7 @@ export default function RegistrarPonto() {
             description:
               result.created === 0
                 ? "Todos os dias já estavam preenchidos."
-                : `${result.created} dia${result.created !== 1 ? "s" : ""} criado${result.created !== 1 ? "s" : ""} com 08:00–16:10. ${result.skipped} pulado${result.skipped !== 1 ? "s" : ""} (dom./feriados/existentes).`,
+                : `${result.created} dia${result.created !== 1 ? "s" : ""} criado${result.created !== 1 ? "s" : ""} com a jornada padrão. ${result.skipped} pulado${result.skipped !== 1 ? "s" : ""} (dom./feriados/existentes).`,
           });
         },
         onError: () => {
@@ -103,15 +56,15 @@ export default function RegistrarPonto() {
             variant: "destructive",
           });
         },
-      }
+      },
     );
   }
 
   const hasMissing = !dismissedAlert && missingDays && missingDays.length > 0;
   const now = new Date();
   const monthNames = [
-    "Janeiro","Fevereiro","Março","Abril","Maio","Junho",
-    "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro",
+    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
   ];
   const currentMonthName = monthNames[now.getMonth()];
 
@@ -122,7 +75,6 @@ export default function RegistrarPonto() {
         Registrar Ponto
       </h1>
 
-      {/* Missing days alert */}
       {hasMissing && (
         <div className="flex items-start gap-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 text-sm">
           <AlertTriangle
@@ -151,41 +103,13 @@ export default function RegistrarPonto() {
         </div>
       )}
 
-      {/* Quick buttons */}
-      <div className="grid grid-cols-2 gap-3">
-        <button
-          data-testid="button-quick-entry"
-          onClick={handleQuickEntry}
-          className="flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-sm font-semibold shadow-sm transition"
-        >
-          <LogIn size={17} /> Registrar Entrada
-        </button>
-        <button
-          data-testid="button-quick-exit"
-          onClick={handleQuickExit}
-          className="flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-sm font-semibold shadow-sm transition"
-        >
-          <LogOut size={17} /> Registrar Saída
-        </button>
-      </div>
-
-      {prefillEntry && (
-        <p className="text-xs text-muted-foreground text-center -mt-2">
-          Entrada capturada:{" "}
-          <span className="font-mono font-medium text-foreground">{prefillEntry}</span>
-          {" — "}clique em <strong>Registrar Saída</strong> quando terminar ou preencha o formulário
-          abaixo.
-        </p>
-      )}
-
-      {/* Bulk generate */}
       <div className="bg-card border border-card-border rounded-2xl p-4 shadow-sm flex items-center gap-4">
         <div className="flex-1">
           <p className="text-sm font-semibold">Gerar Mês Padrão</p>
           <p className="text-xs text-muted-foreground mt-0.5">
             Preenche todos os dias úteis de{" "}
-            <span className="font-medium text-foreground">{currentMonthName}</span> com 08:00 → 16:10
-            (saldo zero). Pula domingos, feriados e dias já registrados.
+            <span className="font-medium text-foreground">{currentMonthName}</span> com a jornada padrão
+            das Configurações. Pula domingos, feriados e dias já registrados.
           </p>
         </div>
         <button
@@ -203,9 +127,8 @@ export default function RegistrarPonto() {
         </button>
       </div>
 
-      {/* Full record form */}
       <div id="record-form">
-        <RecordForm prefillEntry={prefillEntry} prefillExit={prefillExit} />
+        <RecordForm />
       </div>
     </div>
   );

@@ -58,8 +58,21 @@ function saveRecords(rows: TimeRecord[]): void {
   writeKey(userKey("records"), rows);
 }
 
+type LegacySettings = Settings & { dailyTargetMinutes?: number };
+
 function loadSettings(): Settings {
-  return readKey<Settings>(userKey("settings"), DEFAULT_SETTINGS);
+  const raw = readKey<LegacySettings>(userKey("settings"), DEFAULT_SETTINGS);
+  if (raw.defaultEntryTime && raw.defaultExitTime) {
+    return {
+      id: raw.id ?? 1,
+      defaultEntryTime: raw.defaultEntryTime,
+      defaultExitTime: raw.defaultExitTime,
+      manualAdjustmentMinutes: raw.manualAdjustmentMinutes ?? 0,
+      lunchBreakMinutes: raw.lunchBreakMinutes ?? 60,
+      goalMinutes: raw.goalMinutes ?? null,
+    };
+  }
+  return { ...DEFAULT_SETTINGS, ...raw };
 }
 
 function saveSettings(s: Settings): void {
@@ -221,6 +234,21 @@ export function useDeleteRecord() {
   });
 }
 
+export function useDeleteRecordsBulk() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ ids }: { ids: number[] }): Promise<{ deleted: number }> => {
+      const unique = Array.from(new Set(ids)).filter((n) => Number.isFinite(n));
+      if (unique.length === 0) return { deleted: 0 };
+      const rows = loadRecords();
+      const next = rows.filter((r) => !unique.includes(r.id));
+      saveRecords(next);
+      return { deleted: rows.length - next.length };
+    },
+    onSuccess: () => invalidateAll(qc),
+  });
+}
+
 export function useUpdateSettings() {
   const qc = useQueryClient();
   return useMutation({
@@ -249,9 +277,14 @@ export function useBulkGenerateMonth() {
     }): Promise<BulkGenerateResult> => {
       const rows = loadRecords();
       const existing = new Set(rows.map((r) => r.date));
-      const { toCreate, skipped } = bulkGenerateInputs(data.year, data.month, existing);
-
       const settings = loadSettings();
+      const { toCreate, skipped } = bulkGenerateInputs(
+        data.year,
+        data.month,
+        existing,
+        settings,
+      );
+
       let id = nextId(rows);
       for (const input of toCreate) {
         const { workedMinutes, balanceMinutes } = computeBalanceForRecord(input, settings);

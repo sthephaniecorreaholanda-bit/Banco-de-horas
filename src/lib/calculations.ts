@@ -25,15 +25,12 @@ export function hhmmToMin(hhmm: string | null | undefined): number | null {
 export function computeWorkedMinutes(
   entryTime: string | null | undefined,
   exitTime: string | null | undefined,
-  _lunchBreakMinutes: number,
+  lunchBreakMinutes: number,
 ): number {
   const e = hhmmToMin(entryTime);
   const x = hhmmToMin(exitTime);
   if (e === null || x === null) return 0;
-  // Decisão de produto (replit.md): "08:00–16:10 = saldo zero" implica que o
-  // almoço já está embutido no cálculo: worked = exit - entry, sem deduzir.
-  // A jornada padrão (430 min) já representa o tempo líquido esperado.
-  return Math.max(0, x - e);
+  return Math.max(0, x - e - Math.max(0, lunchBreakMinutes));
 }
 
 export function computeBalanceForRecord(
@@ -41,23 +38,32 @@ export function computeBalanceForRecord(
   settings: Settings,
 ): { workedMinutes: number; balanceMinutes: number } {
   if (input.type === "WORK_DAY") {
+    const standardNet = computeWorkedMinutes(
+      settings.defaultEntryTime,
+      settings.defaultExitTime,
+      settings.lunchBreakMinutes,
+    );
     const worked = computeWorkedMinutes(
+      input.entryTime ?? settings.defaultEntryTime,
+      input.exitTime ?? settings.defaultExitTime,
+      settings.lunchBreakMinutes,
+    );
+    return {
+      workedMinutes: worked,
+      balanceMinutes: worked - standardNet,
+    };
+  }
+  if (input.type === "COMPENSATED_LEAVE") {
+    const debit = computeWorkedMinutes(
       input.entryTime ?? null,
       input.exitTime ?? null,
       settings.lunchBreakMinutes,
     );
     return {
-      workedMinutes: worked,
-      balanceMinutes: worked - settings.dailyTargetMinutes,
+      workedMinutes: debit,
+      balanceMinutes: -debit,
     };
   }
-  if (input.type === "COMPENSATED_LEAVE") {
-    return {
-      workedMinutes: 0,
-      balanceMinutes: -settings.dailyTargetMinutes,
-    };
-  }
-  // HOLIDAY: neutro
   return { workedMinutes: 0, balanceMinutes: 0 };
 }
 
@@ -146,7 +152,6 @@ export function computeMissingDays(records: TimeRecord[]): MissingDay[] {
   const today = new Date();
   const todayIso = today.toISOString().slice(0, 10);
 
-  // Olhamos os últimos 14 dias corridos, exclui o dia de hoje (ainda em curso).
   const result: MissingDay[] = [];
   for (let i = 1; i <= 14; i++) {
     const d = new Date(today);
@@ -197,6 +202,7 @@ export function bulkGenerateInputs(
   year: number,
   month: number,
   existingDates: Set<string>,
+  settings: Settings,
 ): { toCreate: TimeRecordInput[]; skipped: number } {
   const daysInMonth = new Date(year, month, 0).getDate();
   const toCreate: TimeRecordInput[] = [];
@@ -215,8 +221,8 @@ export function bulkGenerateInputs(
     toCreate.push({
       date: iso,
       type: "WORK_DAY",
-      entryTime: "08:00",
-      exitTime: "16:10",
+      entryTime: settings.defaultEntryTime,
+      exitTime: settings.defaultExitTime,
       note: null,
     });
   }

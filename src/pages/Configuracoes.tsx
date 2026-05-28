@@ -17,7 +17,8 @@ export default function Configuracoes() {
   const { data: settings, isLoading } = useGetSettings();
   const updateSettings = useUpdateSettings();
 
-  const [targetHHMM, setTargetHHMM] = useState("07:10");
+  const [entryHHMM, setEntryHHMM] = useState("08:00");
+  const [exitHHMM, setExitHHMM] = useState("17:00");
   const [adjustMinutes, setAdjustMinutes] = useState("0");
   const [adjustSign, setAdjustSign] = useState<"+" | "-">("+");
   const [lunchHHMM, setLunchHHMM] = useState("01:00");
@@ -27,7 +28,8 @@ export default function Configuracoes() {
 
   useEffect(() => {
     if (settings) {
-      setTargetHHMM(minutesToHHMM(settings.dailyTargetMinutes));
+      setEntryHHMM(settings.defaultEntryTime);
+      setExitHHMM(settings.defaultExitTime);
       const adj = settings.manualAdjustmentMinutes;
       setAdjustSign(adj < 0 ? "-" : "+");
       setAdjustMinutes(minutesToHHMM(Math.abs(adj)));
@@ -46,7 +48,6 @@ export default function Configuracoes() {
 
   function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    const dailyTargetMinutes = hhmmToMinutes(targetHHMM);
     const rawAdjust = hhmmToMinutes(adjustMinutes);
     const manualAdjustmentMinutes = adjustSign === "-" ? -rawAdjust : rawAdjust;
     const lunchBreakMinutes = hhmmToMinutes(lunchHHMM);
@@ -58,7 +59,15 @@ export default function Configuracoes() {
     }
 
     updateSettings.mutate(
-      { data: { dailyTargetMinutes, manualAdjustmentMinutes, lunchBreakMinutes, goalMinutes } },
+      {
+        data: {
+          defaultEntryTime: entryHHMM,
+          defaultExitTime: exitHHMM,
+          manualAdjustmentMinutes,
+          lunchBreakMinutes,
+          goalMinutes,
+        },
+      },
       {
         onSuccess: () => {
           toast({ title: "Configurações salvas" });
@@ -86,21 +95,36 @@ export default function Configuracoes() {
       </h1>
 
       <form onSubmit={handleSave} className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-4">
-        {/* Daily target */}
+        {/* Jornada padrão */}
         <div className="bg-card border border-card-border rounded-2xl p-5 shadow-sm space-y-3">
           <div>
-            <h2 className="font-semibold text-sm">Meta Diária de Horas</h2>
+            <h2 className="font-semibold text-sm">Jornada Padrão</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Jornada padrão de segunda a sábado. Padrão: 07:10.
+              Horários usados como base quando você não informar Entrada/Saída no dia.
             </p>
           </div>
-          <input
-            data-testid="input-daily-target"
-            type="time"
-            value={targetHHMM}
-            onChange={(e) => setTargetHHMM(e.target.value)}
-            className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring transition font-mono"
-          />
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Hora de Entrada</label>
+              <input
+                data-testid="input-default-entry"
+                type="time"
+                value={entryHHMM}
+                onChange={(e) => setEntryHHMM(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring transition font-mono"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Hora de Saída</label>
+              <input
+                data-testid="input-default-exit"
+                type="time"
+                value={exitHHMM}
+                onChange={(e) => setExitHHMM(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring transition font-mono"
+              />
+            </div>
+          </div>
         </div>
 
         {/* Lunch break */}
@@ -124,9 +148,17 @@ export default function Configuracoes() {
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted rounded-xl px-3 py-2">
             <Info size={13} className="flex-shrink-0" />
             <span>
-              Exemplo: 08:00 → 16:10 = 08h10m − {minutesToHHMM(hhmmToMinutes(lunchHHMM))} almoço ={" "}
+              Exemplo: {entryHHMM} → {exitHHMM} ={" "}
+              {minutesToHHMM(Math.max(0, hhmmToMinutes(exitHHMM) - hhmmToMinutes(entryHHMM)))} −{" "}
+              {minutesToHHMM(hhmmToMinutes(lunchHHMM))} almoço ={" "}
               <span className="font-mono font-medium text-foreground">
-                {minutesToHHMM(490 - hhmmToMinutes(lunchHHMM))} trabalhados
+                {minutesToHHMM(
+                  Math.max(
+                    0,
+                    hhmmToMinutes(exitHHMM) - hhmmToMinutes(entryHHMM) - hhmmToMinutes(lunchHHMM),
+                  ),
+                )}{" "}
+                trabalhados
               </span>
             </span>
           </div>
@@ -235,9 +267,10 @@ export default function Configuracoes() {
         <div className="lg:col-span-2 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-2xl p-4 text-xs text-blue-700 dark:text-blue-300 space-y-1.5">
           <p className="font-semibold">Regras do sistema</p>
           <ul className="space-y-1 list-disc list-inside">
-            <li>Alterações na meta diária afetam apenas registros futuros</li>
-            <li>Almoço é descontado automaticamente do tempo total registrado</li>
-            <li>Folga compensada desconta 1 dia completo do saldo</li>
+            <li>Jornada padrão é usada quando o dia não tiver horários informados</li>
+            <li>Almoço é descontado automaticamente do total (Saída − Entrada − Almoço)</li>
+            <li>Dia Comum: saldo = tempo trabalhado − jornada padrão líquida</li>
+            <li>Folga compensada debita a jornada líquida do dia informado</li>
             <li>Feriados nacionais e domingos são neutros automaticamente</li>
           </ul>
         </div>

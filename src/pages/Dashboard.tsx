@@ -3,7 +3,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetSummary,
   useGetMissingDays,
-  useCreateRecord,
   getListRecordsQueryKey,
   getGetSummaryQueryKey,
   getGetMonthlyEvolutionQueryKey,
@@ -15,21 +14,16 @@ import {
   formatMinutes,
   getBalanceColor,
   getBalanceBg,
-  currentTime,
-  todayISO,
 } from "@/lib/time";
 import {
   Briefcase,
   UmbrellaOff,
   CalendarX2,
   Clock,
-  LogIn,
-  LogOut,
   AlertTriangle,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useToast } from "@/hooks/use-toast";
 
 function SummaryCard({
   icon: Icon,
@@ -69,48 +63,6 @@ export default function Dashboard() {
   const { data: summary, isLoading: summaryLoading } = useGetSummary();
   const { data: missingDays } = useGetMissingDays();
   const [dismissedAlert, setDismissedAlert] = useState(false);
-  const [prefillEntry, setPrefillEntry] = useState<string | undefined>();
-  const [prefillExit, setPrefillExit] = useState<string | undefined>();
-  const qc = useQueryClient();
-  const { toast } = useToast();
-  const createRecord = useCreateRecord();
-
-  function invalidateAll() {
-    qc.invalidateQueries({ queryKey: getListRecordsQueryKey() });
-    qc.invalidateQueries({ queryKey: getGetSummaryQueryKey() });
-    qc.invalidateQueries({ queryKey: getGetMonthlyEvolutionQueryKey() });
-    qc.invalidateQueries({ queryKey: getGetMissingDaysQueryKey() });
-  }
-
-  function handleQuickEntry() {
-    const now = currentTime();
-    setPrefillEntry(now);
-    setPrefillExit(undefined);
-    // scroll to form
-    document.getElementById("record-form")?.scrollIntoView({ behavior: "smooth" });
-    toast({ title: "Horário de entrada capturado", description: `${now} pré-preenchido no formulário.` });
-  }
-
-  function handleQuickExit() {
-    const now = currentTime();
-    setPrefillExit(now);
-    // Quick-register exit: create record with today's date and computed exit
-    createRecord.mutate(
-      { data: { date: todayISO(), type: "WORK_DAY", entryTime: prefillEntry ?? "08:00", exitTime: now } },
-      {
-        onSuccess: () => {
-          toast({ title: "Saída registrada", description: `Saída às ${now} salva com sucesso.` });
-          setPrefillEntry(undefined);
-          setPrefillExit(undefined);
-          invalidateAll();
-        },
-        onError: (err: unknown) => {
-          const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Erro ao registrar saída.";
-          toast({ title: "Erro", description: msg, variant: "destructive" });
-        },
-      }
-    );
-  }
 
   const balance = summary?.totalBalanceMinutes ?? 0;
   const balanceColor = getBalanceColor(balance);
@@ -142,24 +94,6 @@ export default function Dashboard() {
           </button>
         </div>
       )}
-
-      {/* Quick entry/exit buttons */}
-      <div className="grid grid-cols-2 gap-3">
-        <button
-          data-testid="button-quick-entry"
-          onClick={handleQuickEntry}
-          className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-sm font-medium shadow-sm transition"
-        >
-          <LogIn size={16} /> Registrar Entrada
-        </button>
-        <button
-          data-testid="button-quick-exit"
-          onClick={handleQuickExit}
-          className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-sm font-medium shadow-sm transition"
-        >
-          <LogOut size={16} /> Registrar Saída
-        </button>
-      </div>
 
       {/* Summary cards */}
       {summaryLoading ? (
@@ -208,7 +142,7 @@ export default function Dashboard() {
 
       {/* Record form */}
       <div id="record-form">
-        <RecordForm prefillEntry={prefillEntry} prefillExit={prefillExit} />
+        <RecordForm />
       </div>
     </div>
   );

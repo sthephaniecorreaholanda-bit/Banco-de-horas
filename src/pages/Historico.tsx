@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useListRecords,
   useDeleteRecord,
+  useDeleteRecordsBulk,
   useUpdateRecord,
   useExportRecords,
+  useGetSettings,
   getListRecordsQueryKey,
   getGetSummaryQueryKey,
   getGetMonthlyEvolutionQueryKey,
@@ -60,26 +62,35 @@ function EditableCard({
   record,
   onSaved,
   onDeleted,
+  defaultEntryTime,
+  defaultExitTime,
+  selected,
+  onToggleSelected,
 }: {
   record: TimeRecord;
   onSaved: () => void;
   onDeleted: () => void;
+  defaultEntryTime: string;
+  defaultExitTime: string;
+  selected: boolean;
+  onToggleSelected: (id: number) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [type, setType] = useState(record.type);
-  const [entryTime, setEntryTime] = useState(record.entryTime ?? "08:00");
-  const [exitTime, setExitTime] = useState(record.exitTime ?? "16:10");
+  const [entryTime, setEntryTime] = useState(record.entryTime ?? defaultEntryTime);
+  const [exitTime, setExitTime] = useState(record.exitTime ?? defaultExitTime);
   const [note, setNote] = useState(record.note ?? "");
   const { toast } = useToast();
   const updateRecord = useUpdateRecord();
   const deleteRecord = useDeleteRecord();
 
-  const isWork = type === "WORK_DAY";
+  const hasTimes = type !== "HOLIDAY";
+  const requireTimes = type === "COMPENSATED_LEAVE";
 
   function handleCancelEdit() {
     setType(record.type);
-    setEntryTime(record.entryTime ?? "08:00");
-    setExitTime(record.exitTime ?? "16:10");
+    setEntryTime(record.entryTime ?? defaultEntryTime);
+    setExitTime(record.exitTime ?? defaultExitTime);
     setNote(record.note ?? "");
     setEditing(false);
   }
@@ -90,8 +101,8 @@ function EditableCard({
         id: record.id,
         data: {
           type: type as "WORK_DAY" | "COMPENSATED_LEAVE" | "HOLIDAY",
-          entryTime: isWork ? entryTime : null,
-          exitTime: isWork ? exitTime : null,
+          entryTime: hasTimes ? (entryTime || null) : null,
+          exitTime: hasTimes ? (exitTime || null) : null,
           note: note.trim() || null,
         },
       },
@@ -134,6 +145,13 @@ function EditableCard({
       {/* ── Collapsed view ── */}
       {!editing ? (
         <div className="p-4 flex items-start gap-3">
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={() => onToggleSelected(record.id)}
+            className="mt-1 h-4 w-4 rounded border-input"
+            aria-label="Selecionar registro"
+          />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <span className="font-semibold text-sm">{formatDate(record.date)}</span>
@@ -247,8 +265,7 @@ function EditableCard({
             </div>
           </div>
 
-          {/* Time fields — only for work days */}
-          {isWork && (
+          {hasTimes && (
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
@@ -258,6 +275,7 @@ function EditableCard({
                   type="time"
                   value={entryTime}
                   onChange={(e) => setEntryTime(e.target.value)}
+                  required={requireTimes}
                   className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring transition"
                 />
               </div>
@@ -269,6 +287,7 @@ function EditableCard({
                   type="time"
                   value={exitTime}
                   onChange={(e) => setExitTime(e.target.value)}
+                  required={requireTimes}
                   className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring transition"
                 />
               </div>
@@ -326,9 +345,13 @@ export default function Historico() {
   const { toast } = useToast();
 
   const { data: records, isLoading } = useListRecords({ month, year });
+  const { data: settings } = useGetSettings();
+  const deleteBulk = useDeleteRecordsBulk();
   const { refetch: triggerExport } = useExportRecords({
     query: { enabled: false, queryKey: getExportRecordsQueryKey() },
   });
+
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   function invalidateAll() {
     qc.invalidateQueries({ queryKey: getListRecordsQueryKey() });
@@ -345,6 +368,76 @@ export default function Historico() {
   function nextMonth() {
     if (month === 12) { setMonth(1); setYear((y) => y + 1); }
     else setMonth((m) => m + 1);
+  }
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [month, year]);
+
+  const visibleIds = useMemo(
+    () => (records ? records.map((r) => r.id) : []),
+    [records],
+  );
+
+  const selectedCount = selectedIds.size;
+  const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+  const someSelected = selectedCount > 0 && !allSelected;
+
+  const selectAllRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    if (selectAllRef.current) selectAllRef.current.indeterminate = someSelected;
+  }, [someSelected]);
+
+  function toggleSelected(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds((prev) => {
+      if (!records || records.length === 0) return prev;
+      if (allSelected) return new Set();
+      return new Set(records.map((r) => r.id));
+    });
+  }
+
+  function handleDeleteSelected() {
+    if (selectedIds.size === 0) return;
+    const ok = window.confirm("Tem certeza que deseja excluir os registros selecionados?");
+    if (!ok) return;
+
+    const ids = Array.from(selectedIds);
+    const key = getListRecordsQueryKey({ month, year });
+    const prevRecords = qc.getQueryData<TimeRecord[]>(key);
+    qc.setQueryData<TimeRecord[]>(
+      key,
+      (curr) => (curr ? curr.filter((r) => !selectedIds.has(r.id)) : curr),
+    );
+
+    deleteBulk.mutate(
+      { ids },
+      {
+        onSuccess: (res) => {
+          toast({
+            title: "Registros excluídos",
+            description:
+              res.deleted === 1
+                ? "1 registro removido."
+                : `${res.deleted} registros removidos.`,
+          });
+          setSelectedIds(new Set());
+          invalidateAll();
+        },
+        onError: () => {
+          if (prevRecords) qc.setQueryData(key, prevRecords);
+          toast({ title: "Erro ao excluir selecionados", variant: "destructive" });
+        },
+      },
+    );
   }
 
   async function handleExport() {
@@ -434,12 +527,40 @@ export default function Historico() {
         </div>
       ) : (
         <div className="space-y-2">
+          <div className="bg-card border border-card-border rounded-2xl px-4 py-3 shadow-sm flex items-center justify-between">
+            <label className="flex items-center gap-2 text-sm text-muted-foreground select-none">
+              <input
+                ref={selectAllRef}
+                type="checkbox"
+                checked={allSelected}
+                onChange={toggleSelectAll}
+                className="h-4 w-4 rounded border-input"
+                aria-label="Selecionar todos"
+              />
+              Selecionar todos
+            </label>
+            {selectedCount > 0 && (
+              <button
+                data-testid="button-delete-selected"
+                onClick={handleDeleteSelected}
+                disabled={deleteBulk.isPending}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-destructive text-destructive-foreground text-sm font-semibold hover:opacity-90 active:opacity-80 transition disabled:opacity-60 shadow-sm"
+              >
+                {deleteBulk.isPending ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                Excluir Selecionados ({selectedCount})
+              </button>
+            )}
+          </div>
           {records.map((r) => (
             <EditableCard
               key={r.id}
               record={r}
               onSaved={invalidateAll}
               onDeleted={invalidateAll}
+              defaultEntryTime={settings?.defaultEntryTime ?? "08:00"}
+              defaultExitTime={settings?.defaultExitTime ?? "17:00"}
+              selected={selectedIds.has(r.id)}
+              onToggleSelected={toggleSelected}
             />
           ))}
         </div>

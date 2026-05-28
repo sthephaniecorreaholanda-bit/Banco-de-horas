@@ -57,10 +57,8 @@ src/
 
 ## Regras de cálculo
 
-- `WORK_DAY` (Dia Comum): saldo sempre `00:00` (neutralidade)
-- `COMPENSATED_LEAVE` (Folga Compensada):
-  - Se não informar horários no dia, debita `(HoraSaida − HoraEntrada) − DuracaoAlmoco` (configurações)
-  - Se informar horários, debita `(Saída − Entrada) − DuracaoAlmoco` (do dia)
+- `WORK_DAY` (Dia Comum): saldo = tempo trabalhado − jornada padrão líquida
+- `COMPENSATED_LEAVE` (Folga Compensada): debita `(Saída − Entrada) − Almoço` do dia informado
 - `HOLIDAY`: `balance = 0`
 - Domingos e feriados são neutros automaticamente (não viram dias "faltantes")
 - Ajuste manual entra apenas na soma total, não nos registros

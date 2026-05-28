@@ -2,14 +2,15 @@ import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useCreateRecord,
+  useGetSettings,
   getListRecordsQueryKey,
   getGetSummaryQueryKey,
   getGetMonthlyEvolutionQueryKey,
   getGetMissingDaysQueryKey,
 } from "@/lib/api-local";
-import { todayISO, currentTime } from "@/lib/time";
+import { todayISO } from "@/lib/time";
 import { cn } from "@/lib/utils";
-import { Calendar, Clock, ChevronDown, Loader2, MessageSquare } from "lucide-react";
+import { Calendar, ChevronDown, Loader2, MessageSquare, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const TYPES = [
@@ -18,31 +19,25 @@ const TYPES = [
   { value: "HOLIDAY", label: "Feriado / Folga" },
 ];
 
-export function RecordForm({
-  prefillEntry,
-  prefillExit,
-}: {
-  prefillEntry?: string;
-  prefillExit?: string;
-}) {
+export function RecordForm() {
   const [date, setDate] = useState(todayISO());
   const [type, setType] = useState("WORK_DAY");
-  const [entryTime, setEntryTime] = useState(prefillEntry ?? "08:00");
-  const [exitTime, setExitTime] = useState(prefillExit ?? "16:10");
+  const { data: settings } = useGetSettings();
+  const [entryTime, setEntryTime] = useState("");
+  const [exitTime, setExitTime] = useState("");
   const [note, setNote] = useState("");
+  const [showCustomTimes, setShowCustomTimes] = useState(false);
   const qc = useQueryClient();
   const { toast } = useToast();
   const createRecord = useCreateRecord();
 
   useEffect(() => {
-    if (prefillEntry) setEntryTime(prefillEntry);
-  }, [prefillEntry]);
+    if (!settings) return;
+    setEntryTime(settings.defaultEntryTime);
+    setExitTime(settings.defaultExitTime);
+  }, [settings]);
 
-  useEffect(() => {
-    if (prefillExit) setExitTime(prefillExit);
-  }, [prefillExit]);
-
-  const isWork = type === "WORK_DAY";
+  const hasTimes = type !== "HOLIDAY";
 
   function invalidateAll() {
     qc.invalidateQueries({ queryKey: getListRecordsQueryKey() });
@@ -53,13 +48,26 @@ export function RecordForm({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const resolvedEntry =
+      hasTimes && showCustomTimes
+        ? entryTime || null
+        : hasTimes
+          ? settings?.defaultEntryTime ?? null
+          : null;
+    const resolvedExit =
+      hasTimes && showCustomTimes
+        ? exitTime || null
+        : hasTimes
+          ? settings?.defaultExitTime ?? null
+          : null;
+
     createRecord.mutate(
       {
         data: {
           date,
           type: type as "WORK_DAY" | "COMPENSATED_LEAVE" | "HOLIDAY",
-          entryTime: isWork ? entryTime : null,
-          exitTime: isWork ? exitTime : null,
+          entryTime: resolvedEntry,
+          exitTime: resolvedExit,
           note: note.trim() || null,
         },
       },
@@ -68,8 +76,11 @@ export function RecordForm({
           toast({ title: "Registro salvo", description: "Dia registrado com sucesso." });
           setDate(todayISO());
           setType("WORK_DAY");
-          setEntryTime("08:00");
-          setExitTime("16:10");
+          setShowCustomTimes(false);
+          if (settings) {
+            setEntryTime(settings.defaultEntryTime);
+            setExitTime(settings.defaultExitTime);
+          }
           setNote("");
           invalidateAll();
         },
@@ -79,7 +90,7 @@ export function RecordForm({
             "Erro ao salvar registro.";
           toast({ title: "Erro", description: msg, variant: "destructive" });
         },
-      }
+      },
     );
   }
 
@@ -93,7 +104,6 @@ export function RecordForm({
       </h2>
 
       <div className="grid grid-cols-2 gap-3">
-        {/* Date */}
         <div className="col-span-2 sm:col-span-1 flex flex-col gap-1.5">
           <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
             <Calendar size={13} /> Data
@@ -108,7 +118,6 @@ export function RecordForm({
           />
         </div>
 
-        {/* Type */}
         <div className="col-span-2 sm:col-span-1 flex flex-col gap-1.5">
           <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
             <ChevronDown size={13} /> Tipo de Dia
@@ -127,37 +136,67 @@ export function RecordForm({
           </select>
         </div>
 
-        {/* Entry / Exit */}
-        <div className={cn("flex flex-col gap-1.5", !isWork && "opacity-40 pointer-events-none")}>
-          <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <Clock size={13} /> Entrada
-          </label>
-          <input
-            data-testid="input-entry"
-            type="time"
-            value={entryTime}
-            onChange={(e) => setEntryTime(e.target.value)}
-            disabled={!isWork}
-            className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring transition"
-          />
-        </div>
+        {hasTimes && (
+          <div className="col-span-2 space-y-2">
+            <button
+              type="button"
+              onClick={() => setShowCustomTimes((v) => !v)}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-xl border border-input bg-muted text-xs font-medium text-muted-foreground hover:bg-accent transition"
+            >
+              <span className="flex items-center gap-2">
+                <Clock size={13} />
+                Ajuste de Horário (opcional)
+              </span>
+              <span className="flex items-center gap-1">
+                <span>{showCustomTimes ? "Ocultar" : "Ajustar"}</span>
+                <ChevronDown
+                  size={12}
+                  className={cn(
+                    "transition-transform",
+                    showCustomTimes ? "rotate-180" : "rotate-0",
+                  )}
+                />
+              </span>
+            </button>
 
-        <div className={cn("flex flex-col gap-1.5", !isWork && "opacity-40 pointer-events-none")}>
-          <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <Clock size={13} /> Saída
-          </label>
-          <input
-            data-testid="input-exit"
-            type="time"
-            value={exitTime}
-            onChange={(e) => setExitTime(e.target.value)}
-            disabled={!isWork}
-            className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring transition"
-          />
-        </div>
+            {showCustomTimes && (
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                    <Clock size={13} /> Entrada personalizada
+                  </label>
+                  <input
+                    data-testid="input-entry-custom"
+                    type="time"
+                    value={entryTime}
+                    onChange={(e) => setEntryTime(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring transition"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                    <Clock size={13} /> Saída personalizada
+                  </label>
+                  <input
+                    data-testid="input-exit-custom"
+                    type="time"
+                    value={exitTime}
+                    onChange={(e) => setExitTime(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring transition"
+                  />
+                </div>
+                <p className="col-span-2 text-[11px] text-muted-foreground bg-muted rounded-xl px-3 py-2 leading-relaxed">
+                  Se você preencher estes horários, eles{" "}
+                  <span className="font-semibold text-foreground">substituem a jornada padrão</span>{" "}
+                  das Configurações <span className="font-semibold">apenas para este registro</span>.
+                  Deixe em branco para usar automaticamente os horários padrão.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Note */}
       <div className="flex flex-col gap-1.5">
         <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
           <MessageSquare size={13} /> Observações{" "}

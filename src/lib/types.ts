@@ -29,14 +29,16 @@ export type TimeRecordUpdate = {
 
 export type Settings = {
   id: number;
-  dailyTargetMinutes: number;
+  defaultEntryTime: string; // HH:MM
+  defaultExitTime: string; // HH:MM
   manualAdjustmentMinutes: number;
   lunchBreakMinutes: number;
   goalMinutes: number | null;
 };
 
 export type SettingsUpdate = {
-  dailyTargetMinutes?: number;
+  defaultEntryTime?: string;
+  defaultExitTime?: string;
   manualAdjustmentMinutes?: number;
   lunchBreakMinutes?: number;
   goalMinutes?: number | null;
@@ -80,7 +82,8 @@ export type BulkGenerateResult = {
 
 export const DEFAULT_SETTINGS: Settings = {
   id: 1,
-  dailyTargetMinutes: 430,
+  defaultEntryTime: "08:00",
+  defaultExitTime: "17:00",
   manualAdjustmentMinutes: 0,
   lunchBreakMinutes: 60,
   goalMinutes: null,
