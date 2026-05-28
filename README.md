@@ -1,6 +1,6 @@
 # Banco de Horas Pro
 
-App client-side de controle de banco de horas (jornada de 07:10, segunda a sábado).
+App client-side de controle de banco de horas com jornada **configurável**.
 Tudo é salvo no `localStorage` do navegador — **não há backend**.
 
 ## Stack
@@ -57,9 +57,10 @@ src/
 
 ## Regras de cálculo
 
-- 08:00–16:10 → saldo zero (almoço já embutido)
-- `WORK_DAY`: `balance = (saída − entrada) − metaDiária`
-- `COMPENSATED_LEAVE`: `balance = −metaDiária` (−07:10)
+- `WORK_DAY` (Dia Comum): saldo sempre `00:00` (neutralidade)
+- `COMPENSATED_LEAVE` (Folga Compensada):
+  - Se não informar horários no dia, debita `(HoraSaida − HoraEntrada) − DuracaoAlmoco` (configurações)
+  - Se informar horários, debita `(Saída − Entrada) − DuracaoAlmoco` (do dia)
 - `HOLIDAY`: `balance = 0`
 - Domingos e feriados são neutros automaticamente (não viram dias "faltantes")
 - Ajuste manual entra apenas na soma total, não nos registros
